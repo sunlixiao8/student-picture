@@ -1,0 +1,4 @@
+theme: jekyll-theme-minimal
+title: 儿童识字小报生成器
+description: AI-powered Children's Literacy Poster Generator
+source: frontend/
