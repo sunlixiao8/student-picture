@@ -24,6 +24,49 @@ const errorMessage = document.getElementById('errorMessage');
 const historyList = document.getElementById('historyList');
 const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
+// API Key 元素
+const apiKeyInput = document.getElementById('apiKeyInput');
+const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
+const apiKeyStatus = document.getElementById('apiKeyStatus');
+
+// API 配置
+const API_BASE_URL = 'https://api.kie.ai/api/v1/jobs';
+
+// 获取 API Key
+function getApiKey() {
+  return localStorage.getItem('nanoBananaApiKey') || '';
+}
+
+// 保存 API Key
+function saveApiKey(key) {
+  if (key && key.trim()) {
+    localStorage.setItem('nanoBananaApiKey', key.trim());
+    showApiKeyStatus('保存成功', true);
+  } else {
+    showApiKeyStatus('请输入有效的 API Key', false);
+  }
+}
+
+// 显示 API Key 状态
+function showApiKeyStatus(message, success) {
+  apiKeyStatus.textContent = success ? `✓ ${message}` : `✗ ${message}`;
+  apiKeyStatus.className = `api-key-status ${success ? 'show' : ''}`;
+  if (success) {
+    setTimeout(() => {
+      apiKeyStatus.className = 'api-key-status';
+    }, 2000);
+  }
+}
+
+// 加载 API Key 到输入框
+function loadApiKey() {
+  const apiKey = getApiKey();
+  if (apiKey) {
+    apiKeyInput.value = apiKey;
+    showApiKeyStatus('已加载', true);
+  }
+}
+
 console.log('=== 儿童识字小报生成器初始化 ===');
 console.log('表单元素:', singleForm);
 console.log('主题选择器:', themeSelect);
@@ -135,6 +178,12 @@ batchForm.addEventListener('submit', async (e) => {
 
 // 单张生成函数
 async function generateSingle(theme, title, aspectRatio, resolution, outputFormat) {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    showError('请先设置 API Key');
+    return;
+  }
+
   isGenerating = true;
   setLoading(true);
   hideResults();
@@ -143,41 +192,48 @@ async function generateSingle(theme, title, aspectRatio, resolution, outputForma
   console.log('参数:', { theme, title, aspectRatio, resolution, outputFormat });
 
   try {
-    // 创建异步任务
-    const url = '/api/poster/generate-async';
-    console.log('请求 URL:', url);
+    // 构建提示词
+    const prompt = buildPrompt(theme, title);
+    console.log('提示词长度:', prompt.length);
 
-    const response = await fetch(url, {
+    // 创建 Nano Banana Pro 任务
+    const response = await fetch(`${API_BASE_URL}/createTask`, {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        theme,
-        title,
-        aspectRatio,
-        resolution,
-        outputFormat
+        model: 'nano-banana-pro',
+        input: {
+          prompt,
+          aspect_ratio: aspectRatio,
+          resolution,
+          output_format: outputFormat
+        }
       })
     });
 
     console.log('响应状态:', response.status, response.statusText);
 
     if (!response.ok) {
-      throw new Error(`HTTP 错误: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('错误响应:', errorText);
+      throw new Error(`API 请求失败: ${response.status}`);
     }
 
     const result = await response.json();
-    console.log('响应数据:', result);
+    console.log('创建任务响应:', result);
 
-    if (!result.success) {
-      throw new Error(result.error || '生成失败');
+    if (result.code !== 200) {
+      throw new Error(result.msg || '创建任务失败');
     }
 
-    currentTaskId = result.data.taskId;
+    const taskId = result.data.taskId;
+    currentTaskId = taskId;
 
     // 轮询任务状态
-    await pollTaskStatus(currentTaskId, theme, title);
+    await pollTaskStatus(taskId, theme, title);
 
   } catch (error) {
     console.error('生成失败:', error);
@@ -187,46 +243,209 @@ async function generateSingle(theme, title, aspectRatio, resolution, outputForma
   }
 }
 
+// 构建提示词
+function buildPrompt(theme, title) {
+  return `请生成一张儿童识字小报《${theme}》，竖版 A4，学习小报版式，适合 5–9 岁孩子认字与看图识物。
+
+# 一、小报标题区（顶部）
+
+**顶部居中大标题**：《${title}》
+* **风格**：十字小报 / 儿童学习报感
+* **文本要求**：大字、醒目、卡通手写体、彩色描边
+* **装饰**：周围添加与 ${theme} 相关的贴纸风装饰，颜色鲜艳
+
+# 二、小报主体（中间主画面）
+
+画面中心是一幅 **卡通插画风的「${theme}」场景**：
+* **整体气氛**：明亮、温暖、积极
+* **构图**：物体边界清晰，方便对应文字，不要过于拥挤。
+
+**场景分区与核心内容**
+1.  **核心区域 A（主要对象）**：表现 ${theme} 的核心活动。
+2.  **核心区域 B（配套设施）**：展示相关的工具或物品。
+3.  **核心区域 C（环境背景）**：体现环境特征（如墙面、指示牌等）。
+
+**主题人物**
+* **角色**：1 位可爱卡通人物（职业/身份：与 ${theme} 匹配）。
+* **动作**：正在进行与场景相关的自然互动。
+
+# 三、必画物体与识字清单（Generated Content）
+
+**请务必在画面中清晰绘制以下物体，并为其预留贴标签的位置：**
+
+**1. 核心角色与设施：**
+${getCoreWords(theme)}
+
+**2. 常见物品/工具：**
+${getItemWords(theme)}
+
+**3. 环境与装饰：**
+${getEnvWords(theme)}
+
+*(注意：画面中的物体数量不限于此，但以上列表必须作为重点描绘对象)*
+
+# 四、识字标注规则
+
+对上述清单中的物体，贴上中文识字标签：
+* **格式**：两行制（第一行拼音带声调，第二行简体汉字）。
+* **样式**：彩色小贴纸风格，白底黑字或深色字，清晰可读。
+* **排版**：标签靠近对应的物体，不遮挡主体。
+
+# 五、画风参数
+* **风格**：儿童绘本风 + 识字小报风
+* **色彩**：高饱和、明快、温暖
+* **质量**：8k resolution, high detail, vector illustration style, clean lines.`;
+}
+
+// 获取词汇
+const vocabularyMap = {
+  supermarket: {
+    core: ['shōu yín yuán 收银员', 'huò jià 货架', 'gòu wù chē 购物车', 'jiǎn suǎn tái 收银台'],
+    items: ['píng guǒ 苹果', 'niú nǎi 牛奶', 'miàn bāo 面包', 'yī fu 衣服', 'shuǐ guǒ 水果', 'shū cài 蔬菜', 'dàn 鸡蛋', 'guǒ zhī 果汁'],
+    environment: ['chū kǒu 出口', 'rù kǒu 入口', 'dēng 灯', 'qiáng 墙', 'zhǐ tiáo 指示牌']
+  },
+  hospital: {
+    core: ['yī shēng 医生', 'hù shì 护士', 'yī yuàn 医院', 'bìng chuáng 病床'],
+    items: ['yào 药', 'tǐ wēn jǐ 体温计', 'tīng zhěn qì 听诊器', 'bēng dài 绷带', 'yī shǒu shǒu tào 医用手套', 'yào xiāng 药箱', 'zhēn 针', 'yā suō jī 压缩机'],
+    environment: ['zhěn shì 诊室', 'yào fáng 药房', 'zǒu láng 走廊', 'mén 门', 'chuāng 窗']
+  },
+  park: {
+    core: ['shù 树', 'huā 花', 'cǎo 草', 'gōng yuán 公园'],
+    items: ['qiū qiān 秋千', 'huá tī 滑梯', 'dàng qiū qiān 荡秋千', 'yǐ zi 椅子', 'shuǐ chí 水池', 'niǎo 鸟', 'hú dié 蝴蝶', 'qiú 球'],
+    environment: ['lù 路', 'shān 山', 'hé 河', 'qiáo 桥', 'tiān kōng 天空']
+  },
+  school: {
+    core: ['lǎo shī 老师', 'xué shēng 学生', 'jiào shì 教室', 'hēi bǎn 黑板'],
+    items: ['shū 书', 'bǐ 笔', 'běn zi 本子', 'zhuō zi 桌子', 'yǐ zi 椅子', 'bāo 书包', 'chǐ 尺', 'xiàng pí 橡皮'],
+    environment: ['mén 门', 'chuāng 窗', 'qiáng 墙', 'dēng 灯', 'bù 布告栏']
+  },
+  zoo: {
+    core: ['shī zi 狮子', 'dà xiàng 大象', 'hóu zi 猴子', 'dòng wù yuán 动物园'],
+    items: ['lǎo hǔ 老虎', 'cháng jǐng lù 长颈鹿', 'xióng māo 熊猫', 'kǒng què 孔雀', 'píng fēn 企鹅', 'hǎi tún 海豚', 'wū guī 乌龟'],
+    environment: ['lóng zi 笼子', 'shuǐ chí 水池', 'shù 树', 'cǎo 草', 'lù 路']
+  },
+  kitchen: {
+    core: ['chú fáng 厨房', 'guō 锅', 'pán 盘', 'zhuō zi 桌子'],
+    items: ['dāo 刀', 'chā 叉', 'kuài zi 筷子', 'wǎn 碗', 'bēi zi 杯子', 'shuǐ hú 水壶', 'guō shào 锅勺', 'cài 菜'],
+    environment: ['chú guì 橱柜', 'zào tái 灶台', 'shuǐ lóng tóu 水龙头', 'qiáng 墙', 'chuāng 窗']
+  },
+  bedroom: {
+    core: ['chuáng 床', 'zhěn tou 枕头', 'bèi zi 被子', 'wò shì 卧室'],
+    items: ['xiāng zi 箱子', 'yī guì 衣柜', 'dēng 灯', 'shū zhuō 书桌', 'yǐ zi 椅子', 'jìng zi 镜子', 'huà huà 画画', 'wán jù 玩具'],
+    environment: ['mén 门', 'chuāng 窗', 'qiáng 墙', 'dì 地', 'tiān huā bǎn 天花板']
+  },
+  playground: {
+    core: ['yóu lè chǎng 游乐场', 'qiū qiān 秋千', 'huá tī 滑梯', 'dān gàng 单杠'],
+    items: ['pán qiū qiān 攀秋千', 'qí mǎ 骑马', 'huá lún 滑轮', 'bèng bèng chù 蹦蹦床', 'qí qián 骑钱', 'wán jù 玩具', 'qiú 球'],
+    environment: ['dì 地', 'shù 树', 'lù 路', 'qiáng 墙', 'zhào péng 罩棚']
+  },
+  library: {
+    core: ['tú shū guǎn 图书馆', 'shū jià 书架', 'shū 书', 'guǎn lǐ yuán 管理员'],
+    items: ['kàn shū 看书', 'bǐ 笔', 'běn zi 本子', 'diàn nǎo 电脑', 'zhuō zi 桌子', 'yǐ zi 椅子', 'shū bāo 书包', 'bān zhī 板纸'],
+    environment: ['mén 门', 'chuāng 窗', 'qiáng 墙', 'dēng 灯', 'lù 路']
+  },
+  transportation: {
+    core: ['chē 车', 'gōng jiāo chē 公交车', 'diàn tiě 地铁', 'huǒ chē 火车'],
+    items: ['chē zhàn 车站', 'zhào xiàng 照相', 'dēng 灯', 'zhǐ tiáo 指示牌', 'qiáo 桥', 'lù 路', 'jiāo tōng 交通', 'xíng 行'],
+    environment: ['tiān 天空', 'qiáng 墙', 'dì 地', 'shù 树', 'hé 河']
+  }
+};
+
+function getCoreWords(theme) {
+  const vocab = vocabularyMap[theme] || vocabularyMap.supermarket;
+  return vocab.core.map(w => w).join(', ');
+}
+
+function getItemWords(theme) {
+  const vocab = vocabularyMap[theme] || vocabularyMap.supermarket;
+  return vocab.items.map(w => w).join(', ');
+}
+
+function getEnvWords(theme) {
+  const vocab = vocabularyMap[theme] || vocabularyMap.supermarket;
+  return vocab.environment.map(w => w).join(', ');
+}
+
+// 支持自定义主题的词汇生成
+function getCustomWords(theme) {
+  // 为自定义主题生成简单的词汇
+  return {
+    core: [`${theme}工作人员`, `${theme}设施`, `${theme}设备`, `${theme}工具`],
+    items: [`${theme}物品1`, `${theme}物品2`, `${theme}物品3`, `${theme}物品4`, `${theme}物品5`, `${theme}物品6`, `${theme}物品7`, `${theme}物品8`],
+    environment: [`${theme}环境1`, `${theme}环境2`, `${theme}环境3`, `${theme}环境4`, `${theme}环境5`]
+  };
+}
+
 // 批量生成函数
 async function generateBatch(items, aspectRatio, resolution, outputFormat) {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    showError('请先设置 API Key');
+    return;
+  }
+
   isGenerating = true;
   setLoading(true);
   hideResults();
 
   try {
-    const response = await fetch('/api/poster/batch-async', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        items: items.map(item => ({
-          ...item,
-          aspectRatio,
-          resolution,
-          outputFormat
-        }))
-      })
+    const taskResults = [];
+
+    // 并行创建任务
+    const taskPromises = items.map(async (item) => {
+      const prompt = buildPrompt(item.theme, item.title);
+      const response = await fetch(`${API_BASE_URL}/createTask`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'nano-banana-pro',
+          input: {
+            prompt,
+            aspect_ratio: aspectRatio,
+            resolution,
+            output_format: outputFormat
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`创建任务失败: ${item.title}`);
+      }
+
+      const result = await response.json();
+      if (result.code !== 200) {
+        throw new Error(`任务创建失败: ${item.title}`);
+      }
+
+      return {
+        theme: item.theme,
+        title: item.title,
+        taskId: result.data.taskId,
+        state: 'waiting'
+      };
     });
 
-    const result = await response.json();
-
-    if (!result.success) {
-      throw new Error(result.error || '批量生成失败');
-    }
+    const tasks = await Promise.all(taskPromises);
+    console.log('批量任务创建完成:', tasks);
 
     // 显示批量任务结果
-    displayBatchResults(result.data.tasks);
+    displayBatchResults(tasks);
 
-    // 轮询每个任务
-    const taskIds = result.data.tasks.filter(t => t.taskId).map(t => t.taskId);
-    const results = await pollBatchTaskStatus(taskIds);
+    // 并行轮询任务状态
+    const pollPromises = tasks.map(async (task) => {
+      await pollTaskStatus(task.taskId, task.theme, task.title);
+    });
+
+    await Promise.all(pollPromises);
 
     setLoading(false);
     isGenerating = false;
 
   } catch (error) {
-    console.error('生成失败:', error);
+    console.error('批量生成失败:', error);
     showError(error.message);
     setLoading(false);
     isGenerating = false;
@@ -235,6 +454,14 @@ async function generateBatch(items, aspectRatio, resolution, outputFormat) {
 
 // 轮询单个任务状态
 async function pollTaskStatus(taskId, theme, title) {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    showError('请先设置 API Key');
+    setLoading(false);
+    isGenerating = false;
+    return;
+  }
+
   progressArea.style.display = 'block';
   updateProgress(0);
 
@@ -248,16 +475,56 @@ async function pollTaskStatus(taskId, theme, title) {
   }, 1000);
 
   try {
-    // 使用等待接口
-    const response = await fetch(`/api/task/${taskId}/wait`);
+    // 查询任务状态
+    const response = await fetch(`${API_BASE_URL}/recordInfo?taskId=${taskId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`API 请求失败: ${response.status}`);
+    }
+
     const result = await response.json();
+    console.log('任务状态:', result);
 
     clearInterval(interval);
-    updateProgress(100);
 
-    if (result.success && result.data.imageUrl) {
+    if (result.code !== 200) {
+      throw new Error(result.msg || '查询任务失败');
+    }
+
+    const { state, resultJson, failCode, failMsg } = result.data;
+
+    // 检查任务状态
+    if (state === 'waiting' || state === 'processing') {
+      // 继续轮询
+      throw new Error('任务处理中，请稍候...');
+    }
+
+    if (state === 'fail') {
+      throw new Error(failMsg || '生成失败');
+    }
+
+    if (state === 'success') {
+      updateProgress(100);
+
+      let imageUrl = null;
+      try {
+        const resultData = JSON.parse(resultJson);
+        imageUrl = resultData.resultUrls?.[0];
+      } catch (e) {
+        console.error('解析结果失败:', e);
+      }
+
+      if (!imageUrl) {
+        throw new Error('未获取到图片链接');
+      }
+
       // 显示结果
-      resultImage.src = result.data.imageUrl;
+      resultImage.src = imageUrl;
       singleResult.style.display = 'block';
 
       // 保存到历史记录
@@ -265,18 +532,15 @@ async function pollTaskStatus(taskId, theme, title) {
         taskId,
         theme,
         title,
-        imageUrl: result.data.imageUrl,
+        imageUrl,
         timestamp: Date.now()
       });
 
       // 设置下载按钮
-      downloadBtn.onclick = () => downloadImage(result.data.imageUrl, `${title}.png`);
+      downloadBtn.onclick = () => downloadImage(imageUrl, `${title}.png`);
 
       // 设置重新生成按钮
       regenerateBtn.onclick = () => singleForm.dispatchEvent(new Event('submit'));
-
-    } else {
-      throw new Error(result.error || '生成失败');
     }
 
   } catch (error) {
@@ -347,7 +611,7 @@ function displayBatchResults(tasks) {
         <div class="batch-result-title">${task.title}</div>
         <div class="batch-result-theme">${task.theme}</div>
       </div>
-      ${task.taskId ? '<div class="loading-spinner">生成中...</div>' : `<div class="error-text">${task.error || '任务创建失败'}</div>`}
+      <div class="loading-spinner">创建任务中...</div>
     `;
     batchResults.appendChild(div);
   });
@@ -361,16 +625,16 @@ function updateBatchResultItem(taskId, imageUrl, error = null) {
       item.innerHTML = `
         <img src="${imageUrl}" class="batch-result-image" alt="生成的识字小报">
         <div class="batch-result-info">
-          <div class="batch-result-title">${item.querySelector('.batch-result-title').textContent}</div>
-          <div class="batch-result-theme">${item.querySelector('.batch-result-theme').textContent}</div>
+          <div class="batch-result-title">${item.querySelector('.batch-result-title')?.textContent || ''}</div>
+          <div class="batch-result-theme">${item.querySelector('.batch-result-theme')?.textContent || ''}</div>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="downloadImage('${imageUrl}', 'poster-${taskId}.png')">下载</button>
       `;
     } else if (error) {
       item.innerHTML = `
         <div class="batch-result-info">
-          <div class="batch-result-title">${item.querySelector('.batch-result-title').textContent}</div>
-          <div class="batch-result-theme">${item.querySelector('.batch-result-theme').textContent}</div>
+          <div class="batch-result-title">${item.querySelector('.batch-result-title')?.textContent || ''}</div>
+          <div class="batch-result-theme">${item.querySelector('.batch-result-theme')?.textContent || ''}</div>
           <div class="error-text">${error}</div>
         </div>
       `;
@@ -503,7 +767,14 @@ function formatDate(timestamp) {
 // 清空历史记录
 clearHistoryBtn.addEventListener('click', clearHistory);
 
+// 保存 API Key
+saveApiKeyBtn.addEventListener('click', () => {
+  const apiKey = apiKeyInput.value.trim();
+  saveApiKey(apiKey);
+});
+
 // 页面加载时加载历史记录
 document.addEventListener('DOMContentLoaded', () => {
+  loadApiKey();
   loadHistory();
 });

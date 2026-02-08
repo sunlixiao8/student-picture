@@ -76,6 +76,7 @@ body {
 }
 
 /* 区块 */
+.api-key-section,
 .form-section,
 .result-section,
 .history-section {
@@ -83,6 +84,71 @@ body {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   padding: 30px;
+  margin-bottom: 30px;
+}
+
+/* API Key 设置 */
+.api-key-section {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+}
+
+.api-key-container {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+}
+
+.api-key-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex: 1;
+}
+
+.api-key-icon {
+  font-size: 2.5rem;
+}
+
+.api-key-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.api-key-desc {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.api-key-input-wrapper {
+  display: flex;
+  gap: 10px;
+  flex: 2;
+}
+
+.api-key-input-wrapper .form-input {
+  flex: 1;
+}
+
+.api-key-input-wrapper .btn {
+  padding: 12px 30px;
+}
+
+.api-key-status {
+  font-size: 0.85rem;
+  color: var(--success-color);
+  margin-left: 10px;
+  display: none;
+}
+
+.api-key-status.show {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .section-title {
