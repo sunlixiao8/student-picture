@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>儿童识字小报生成器</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 头部 -->
+    <header class="header">
+      <h1 class="title">🎨 儿童识字小报生成器</h1>
+      <p class="subtitle">AI-powered Children's Literacy Poster Generator</p>
+    </header>
+
+    <!-- 主要内容区 -->
+    <main class="main-content">
+      <!-- 生成表单 -->
+      <section class="form-section">
+        <h2 class="section-title">生成设置</h2>
+
+        <!-- 模式切换 -->
+        <div class="mode-toggle">
+          <button class="mode-btn active" data-mode="single">单张生成</button>
+          <button class="mode-btn" data-mode="batch">批量生成</button>
+        </div>
+
+        <!-- 单张生成表单 -->
+        <form id="singleForm" class="form-panel active">
+          <!-- 主题选择 -->
+          <div class="form-group">
+            <label for="theme" class="form-label">主题 / 场景</label>
+            <select id="theme" class="form-select" required>
+              <option value="">请选择主题</option>
+              <option value="supermarket">超市</option>
+              <option value="hospital">医院</option>
+              <option value="park">公园</option>
+              <option value="school">学校</option>
+              <option value="zoo">动物园</option>
+              <option value="kitchen">厨房</option>
+              <option value="bedroom">卧室</option>
+              <option value="playground">游乐场</option>
+              <option value="library">图书馆</option>
+              <option value="transportation">交通工具</option>
+            </select>
+            <input type="text" id="customTheme" class="form-input" placeholder="或输入自定义主题" style="display: none;">
+          </div>
+
+          <!-- 标题输入 -->
+          <div class="form-group">
+            <label for="title" class="form-label">小报标题</label>
+            <input type="text" id="title" class="form-input" placeholder="如：走进超市、快乐医院" required>
+          </div>
+
+          <!-- 图片参数 -->
+          <div class="form-row">
+            <div class="form-group">
+              <label for="aspectRatio" class="form-label">图片比例</label>
+              <select id="aspectRatio" class="form-select">
+                <option value="3:4" selected>3:4 (竖版海报)</option>
+                <option value="2:3">2:3 (竖版)</option>
+                <option value="1:1">1:1 (正方形)</option>
+                <option value="4:3">4:3 (横版)</option>
+                <option value="16:9">16:9 (宽屏)</option>
+                <option value="9:16">9:16 (手机竖版)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="resolution" class="form-label">分辨率</label>
+              <select id="resolution" class="form-select">
+                <option value="4K" selected>4K (高清)</option>
+                <option value="2K">2K (标清)</option>
+                <option value="1K">1K (快速)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="outputFormat" class="form-label">输出格式</label>
+              <select id="outputFormat" class="form-select">
+                <option value="png" selected>PNG</option>
+                <option value="jpg">JPG</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 生成按钮 -->
+          <button type="submit" class="btn btn-primary btn-lg">
+            <span class="btn-text">开始生成</span>
+            <span class="btn-loading" style="display: none;">
+              <span class="spinner"></span>
+              生成中...
+            </span>
+          </button>
+        </form>
+
+        <!-- 批量生成表单 -->
+        <form id="batchForm" class="form-panel">
+          <div class="form-group">
+            <label class="form-label">批量项目</label>
+            <div id="batchItems" class="batch-items">
+              <div class="batch-item">
+                <input type="text" class="form-input batch-theme" placeholder="主题" required>
+                <input type="text" class="form-input batch-title" placeholder="标题" required>
+                <button type="button" class="btn btn-danger btn-sm remove-item" disabled>删除</button>
+              </div>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" id="addItemBtn">+ 添加项目</button>
+          </div>
+
+          <!-- 图片参数 -->
+          <div class="form-row">
+            <div class="form-group">
+              <label for="batchAspectRatio" class="form-label">图片比例</label>
+              <select id="batchAspectRatio" class="form-select">
+                <option value="3:4" selected>3:4 (竖版海报)</option>
+                <option value="2:3">2:3 (竖版)</option>
+                <option value="1:1">1:1 (正方形)</option>
+                <option value="4:3">4:3 (横版)</option>
+                <option value="16:9">16:9 (宽屏)</option>
+                <option value="9:16">9:16 (手机竖版)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="batchResolution" class="form-label">分辨率</label>
+              <select id="batchResolution" class="form-select">
+                <option value="4K" selected>4K (高清)</option>
+                <option value="2K">2K (标清)</option>
+                <option value="1K">1K (快速)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="batchOutputFormat" class="form-label">输出格式</label>
+              <select id="batchOutputFormat" class="form-select">
+                <option value="png" selected>PNG</option>
+                <option value="jpg">JPG</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 生成按钮 -->
+          <button type="submit" class="btn btn-primary btn-lg">
+            <span class="btn-text">批量生成</span>
+            <span class="btn-loading" style="display: none;">
+              <span class="spinner"></span>
+              生成中...
+            </span>
+          </button>
+        </form>
+      </section>
+
+      <!-- 生成结果 -->
+      <section class="result-section">
+        <h2 class="section-title">生成结果</h2>
+
+        <!-- 任务进度 -->
+        <div id="progressArea" class="progress-area" style="display: none;">
+          <div class="progress-item">
+            <span class="progress-text">任务进度</span>
+            <div class="progress-bar">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <span class="progress-percent" id="progressPercent">0%</span>
+          </div>
+        </div>
+
+        <!-- 单张结果 -->
+        <div id="singleResult" class="result-container" style="display: none;">
+          <div class="result-image-wrapper">
+            <img id="resultImage" class="result-image" src="" alt="生成的识字小报">
+          </div>
+          <div class="result-actions">
+            <button class="btn btn-success" id="downloadBtn">下载图片</button>
+            <button class="btn btn-secondary" id="regenerateBtn">重新生成</button>
+          </div>
+        </div>
+
+        <!-- 批量结果 -->
+        <div id="batchResults" class="batch-results" style="display: none;"></div>
+
+        <!-- 错误提示 -->
+        <div id="errorArea" class="error-area" style="display: none;">
+          <div class="error-icon">⚠️</div>
+          <div class="error-message" id="errorMessage"></div>
+        </div>
+      </section>
+
+      <!-- 历史记录 -->
+      <section class="history-section">
+        <h2 class="section-title">
+          历史记录
+          <button class="btn btn-secondary btn-sm" id="clearHistoryBtn">清空</button>
+        </h2>
+        <div id="historyList" class="history-list">
+          <p class="empty-message">暂无历史记录</p>
+        </div>
+      </section>
+    </main>
+
+    <!-- 底部 -->
+    <footer class="footer">
+      <p>&copy; 2024 儿童识字小报生成器 | Powered by Nano Banana Pro</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
